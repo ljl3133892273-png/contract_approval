@@ -1,0 +1,31 @@
+# 单机演示部署（SPEC 14.1）
+# 用法:  docker compose up -d
+# 然后访问  http://127.0.0.1:8000/docs
+services:
+  # mock 审批系统（演示用；接真实审批系统后删掉本服务，改 backend 的 APPROVE_API_BASE 即可）
+  mock-approve:
+    build: .
+    command: python -m uvicorn mock_approve_service.main:app --host 0.0.0.0 --port 9000
+    environment:
+      MOCK_APPROVE_TOKEN: ${MOCK_APPROVE_TOKEN:-mock-token}
+    ports:
+      - "9000:9000"
+
+  backend:
+    build: .
+    depends_on:
+      - mock-approve
+    environment:
+      # 容器内互联用服务名；LLM 密钥从宿主 .env 注入（禁止提交真实密钥，SPEC 14.3 红线）
+      APPROVE_API_BASE: http://mock-approve:9000/mock-approve
+      APPROVE_TOKEN: ${APPROVE_TOKEN:-mock-token}
+      MOCK_APPROVE_TOKEN: ${MOCK_APPROVE_TOKEN:-mock-token}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      # SQLite / 文件存储 / 报告目录持久化到宿主
+      - ./data:/app/data
